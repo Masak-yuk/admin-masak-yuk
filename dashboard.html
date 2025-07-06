@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Admin - MasakYuk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-orange: #f97316;
+      --light-orange: #fff7ed;
+      --text-orange: #9a3412;
+      --light-blue: #eff6ff;
+      --text-blue: #1d4ed8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { display: flex; min-height: 100vh; background-color: #f9fafb; color: #1f2937; }
+    .sidebar { width: 240px; background: linear-gradient(180deg, var(--primary-orange), #ea580c); padding: 30px 20px; color: white; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .logo-container { margin-bottom: 40px; }
+    .logo-container img { width: 80px; height: 80px; border-radius: 16px; background: white; padding: 8px; }
+    .logo-container h2 { font-size: 18px; text-align: center; color: white; margin-top: 10px; }
+    .sidebar a { display: block; width: 100%; padding: 12px 20px; margin-bottom: 10px; text-decoration: none; color: white; border-radius: 8px; font-weight: 500; transition: background 0.3s; }
+    .sidebar a.active, .sidebar a:hover { background-color: rgba(255,255,255,0.2); }
+    .main { flex: 1; padding: 40px; overflow-y: auto; }
+    .header { background: linear-gradient(to right, var(--primary-orange), #fb923c); color: white; padding: 30px; border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .header p { font-size: 15px; color: #fef2e0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card-link { text-decoration: none; color: inherit; }
+    .card { background: white; padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.05); transition: all 0.2s; }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); cursor: pointer; }
+    .card h3 { font-size: 16px; margin-bottom: 8px; color: #4b5563; font-weight: 600; }
+    .card p { font-size: 36px; font-weight: 700; color: var(--primary-orange); }
+    .recent-activity { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.05); }
+    .recent-activity h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+    .recent-activity ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .recent-activity li { display: flex; align-items: center; gap: 15px; padding: 12px; background-color: #f9fafb; border-radius: 12px; border: 1px solid #f3f4f6; }
+    .activity-icon { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; }
+    .activity-icon.recipe { background-color: var(--light-orange); color: var(--text-orange); }
+    .activity-icon.user { background-color: var(--light-blue); color: var(--text-blue); }
+    .activity-text { font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo-container">
+      <img src="assets/logo.png" alt="Logo MasakYuk" />
+      <h2>MasakYuk<br>Admin</h2>
+    </div>
+    <a href="dashboard.html" class="active">🏠 Dashboard</a>
+    <a href="kelola-resep.html">📋 Kelola Resep</a>
+    <a href="kelola-pengguna.html">👤 Kelola Pengguna</a>
+    <a href="#" onclick="logout()">🚪 Logout</a>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <h1>Selamat Datang, Admin 👋</h1>
+      <p>Ini adalah ringkasan data terbaru dari MasakYuk.</p>
+    </div>
+
+    <div class="cards">
+      <a href="kelola-resep.html" class="card-link">
+        <div class="card">
+          <h3>Total Resep</h3>
+          <p id="jumlah-resep">0</p>
+        </div>
+      </a>
+      <a href="kelola-pengguna.html" class="card-link">
+        <div class="card">
+          <h3>Total Pengguna</h3>
+          <p id="jumlah-user">0</p>
+        </div>
+      </a>
+    </div>
+
+    <div class="recent-activity">
+      <h3>Aktivitas Terbaru</h3>
+      <ul id="aktivitas-terbaru">
+        </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db } from './js/firebase.js';
+    import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    window.logout = async function () {
+      await signOut(auth);
+      window.location.href = "index.html";
+    };
+
+    async function loadDashboardData() {
+      const activityList = document.getElementById("aktivitas-terbaru");
+      activityList.innerHTML = '<li>Memuat data...</li>';
+      
+      try {
+        // 1. Hitung SEMUA resep
+        const recipeSnap = await getDocs(collection(db, "reseps"));
+        document.getElementById("jumlah-resep").textContent = recipeSnap.size;
+
+        // 2. Hitung Total Pengguna
+        const userSnap = await getDocs(collection(db, "users"));
+        document.getElementById("jumlah-user").textContent = userSnap.size;
+
+        // 3. Ambil Aktivitas Terbaru
+        activityList.innerHTML = '';
+
+        const recipeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`;
+        const userIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+
+        // Ambil 3 resep terbaru
+        const recipeQuery = query(collection(db, "reseps"), orderBy("createdAt", "desc"), limit(3));
+        const recipeActivities = await getDocs(recipeQuery);
+        recipeActivities.forEach(doc => {
+            const resep = doc.data();
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="activity-icon recipe">${recipeIcon}</div>
+                <span class="activity-text">Resep baru "<b>${resep.judul || 'Tanpa Judul'}</b>" ditambahkan.</span>
+            `;
+            activityList.appendChild(li);
+        });
+
+        // Ambil 2 pengguna terbaru
+        const userQuery = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(2));
+        const userActivities = await getDocs(userQuery);
+        userActivities.forEach(doc => {
+            const user = doc.data();
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="activity-icon user">${userIcon}</div>
+                <span class="activity-text">Pengguna baru <b>${user.name || 'Tanpa Nama'}</b> mendaftar.</span>
+            `;
+            activityList.appendChild(li);
+        });
+
+        if (activityList.innerHTML === '') {
+            activityList.innerHTML = '<li>Belum ada aktivitas terbaru.</li>';
+        }
+
+      } catch (error) {
+        console.error("Gagal memuat data dashboard:", error);
+        document.getElementById("aktivitas-terbaru").innerHTML = '<li>Gagal memuat aktivitas.</li>';
+      }
+    }
+
+    // Panggil fungsi utama untuk memuat semua data
+    loadDashboardData();
+  </script>
+</body>
+</html>

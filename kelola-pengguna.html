@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kelola Pengguna - Admin MasakYuk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-orange: #f97316;
+      --dark-orange: #ea580c;
+      --light-orange: #fff7ed;
+      --text-orange: #9a3412;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+    body {
+      display: flex;
+      min-height: 100vh;
+      background-color: #f9fafb;
+      color: #1f2937;
+    }
+    .sidebar {
+      width: 240px;
+      background: linear-gradient(180deg, var(--primary-orange), var(--dark-orange));
+      padding: 30px 20px;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .logo-container { margin-bottom: 40px; }
+    .logo-container img { width: 80px; height: 80px; border-radius: 16px; background: white; padding: 8px; }
+    .logo-container h2 { font-size: 18px; text-align: center; color: white; margin-top: 10px; }
+    .sidebar a { display: block; width: 100%; padding: 12px 20px; margin-bottom: 10px; text-decoration: none; color: white; border-radius: 8px; font-weight: 500; transition: background 0.3s; }
+    .sidebar a.active, .sidebar a:hover { background-color: rgba(255, 255, 255, 0.2); }
+    .main { flex: 1; padding: 40px; overflow-y: auto; }
+    .header { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
+    .header h1 { font-size: 28px; font-weight: 700; color: #111827; }
+    .user-item { background-color: #ffffff; border-radius: 16px; padding: 20px 24px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; transition: all 0.3s ease; }
+    .user-item:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); }
+    .user-info { flex: 1 1 400px; margin-right: 20px; }
+    .user-info h4 { font-size: 20px; margin-bottom: 16px; color: #1f2937; font-weight: 600; }
+    .badges { margin-top: 16px; }
+    .badges span { background-color: #d1fae5; color: #065f46; padding: 5px 12px; font-size: 12px; border-radius: 999px; margin-right: 8px; display: inline-block; font-weight: 500; }
+    .user-actions { flex-shrink: 0; align-self: center; }
+    .user-actions button { margin-left: 8px; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; background-color: #fff; }
+    .btn-badge { color: #059669; border-color: #6ee7b7; }
+    .btn-badge:hover { background-color: #d1fae5; }
+    .btn-delete { color: #dc2626; border-color: #fca5a5; }
+    .btn-delete:hover { background-color: #fee2e2; }
+    #user-list .status-text { text-align: center; padding: 40px; color: #6b7280; }
+
+    /* --- GAYA BARU UNTUK INFO PENGGUNA --- */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 15px;
+    }
+    .info-block {
+        background-color: var(--light-orange);
+        padding: 12px;
+        border-radius: 10px;
+        border-left: 4px solid var(--primary-orange);
+    }
+    .info-block .title {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-orange);
+        display: block;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
+    .info-block .value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        word-break: break-all; /* Agar email panjang tidak merusak layout */
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo-container">
+      <img src="assets/logo.png" alt="Logo MasakYuk" />
+      <h2>MasakYuk<br>Admin</h2>
+    </div>
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="kelola-resep.html">📋 Kelola Resep</a>
+    <a href="kelola-pengguna.html" class="active">👤 Kelola Pengguna</a>
+    <a href="#" onclick="logout()">🚪 Logout</a>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <h1>Manajemen Pengguna</h1>
+    </div>
+    <div id="user-list">
+      </div>
+  </div>
+
+  <script type="module">
+    import { auth, db } from './js/firebase.js';
+    import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { collection, getDocs, query, orderBy, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const userListContainer = document.getElementById('user-list');
+
+    async function loadUsers() {
+      userListContainer.innerHTML = '<p class="status-text">Memuat daftar pengguna...</p>';
+      
+      try {
+        const usersQuery = query(collection(db, "users"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(usersQuery);
+
+        if (snapshot.empty) {
+            userListContainer.innerHTML = '<p class="status-text">Belum ada pengguna yang terdaftar.</p>';
+            return;
+        }
+
+        userListContainer.innerHTML = '';
+
+        snapshot.forEach(docSnap => {
+          const user = docSnap.data();
+          const userId = docSnap.id;
+          const item = document.createElement('div');
+          item.className = 'user-item';
+
+          const namaLengkap = user.name || 'Pengguna Tanpa Nama';
+          const badgesHTML = (user.badges || []).map(badge => `<span>${badge}</span>`).join('');
+          const joinDate = user.createdAt?.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) || 'Tanggal tidak tersedia';
+
+          // --- TEMPLATE BARU YANG LEBIH MENARIK ---
+          item.innerHTML = `
+            <div class="user-info">
+              <h4>${namaLengkap}</h4>
+              <div class="info-grid">
+                <div class="info-block">
+                    <span class="title">Email</span>
+                    <span class="value">${user.email || '-'}</span>
+                </div>
+                <div class="info-block">
+                    <span class="title">Bergabung</span>
+                    <span class="value">${joinDate}</span>
+                </div>
+                <div class="info-block">
+                    <span class="title">Role</span>
+                    <span class="value">${user.role || 'user'}</span>
+                </div>
+              </div>
+              <div class="badges">${badgesHTML || '<em>Tidak ada badge</em>'}</div>
+            </div>
+            <div class="user-actions">
+              <button class="btn-badge" data-id="${userId}">Kelola Badge</button>
+              <button class="btn-delete" data-id="${userId}" data-name="${namaLengkap}">Hapus</button>
+            </div>
+          `;
+          userListContainer.appendChild(item);
+        });
+
+        addEventListeners();
+
+      } catch (error) {
+        console.error("Gagal memuat pengguna:", error);
+        userListContainer.innerHTML = '<p class="status-text" style="color: red;">Gagal memuat data. Silakan coba lagi.</p>';
+      }
+    }
+
+    function addEventListeners() {
+      // Event listener untuk tombol 'Kelola Badge'
+      document.querySelectorAll('.btn-badge').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const userId = e.target.dataset.id;
+          alert(`Fitur Kelola Badge untuk user ID: ${userId} belum diimplementasikan sepenuhnya.`);
+          // Di sini Anda bisa memanggil fungsi untuk membuka modal/panel badge
+        });
+      });
+
+      // Event listener untuk tombol 'Hapus'
+      document.querySelectorAll('.btn-delete').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const userId = e.target.dataset.id;
+          const userName = e.target.dataset.name;
+          if(confirm(`Apakah Anda yakin ingin menghapus pengguna "${userName}"?`)) {
+            try {
+              await deleteDoc(doc(db, "users", userId));
+              alert(`Pengguna "${userName}" berhasil dihapus.`);
+              loadUsers();
+            } catch(error) {
+              console.error("Gagal menghapus pengguna:", error);
+              alert("Gagal menghapus pengguna.");
+            }
+          }
+        });
+      });
+    }
+
+    window.logout = async function () {
+      await signOut(auth);
+      window.location.href = "index.html";
+    }
+
+    loadUsers();
+  </script>
+</body>
+</html>
